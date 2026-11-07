@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Inventario Móvil Multi-Usuario Pro con Stock</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS para exportar a Excel / CSV -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- HTML5-QRCode library for barcode scanning -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .glass-header {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen pb-24">
+
+    <!-- Header Principal -->
+    <header class="sticky top-0 z-30 glass-header text-white shadow-lg border-b border-indigo-500/30">
+        <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-9 h-9 bg-indigo-600/30 rounded-xl flex items-center justify-center border border-indigo-400/30 shadow-inner">
+                    <i class="fa-solid fa-boxes-stacked text-lg text-indigo-300"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-base tracking-wide leading-none">MiInventario Pro</h1>
+                    <span id="currentUserBadge" class="text-[10px] font-semibold bg-indigo-900/80 text-indigo-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1 mt-0.5 border border-indigo-700/50">Cargando...</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-1.5">
+                <!-- Botón Gestión de Usuarios (Solo Admins) -->
+                <button id="btnManageUsers" onclick="openUserManagerModal()" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs flex items-center gap-1 transition border border-slate-700 shadow-sm hidden" title="Gestión de Usuarios">
+                    <i class="fa-solid fa-users-gear text-sm text-indigo-400"></i>
+                </button>
+
+                <!-- Botón Mi Cuenta / Cambiar Contraseña -->
+                <button onclick="openChangePasswordModal()" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs flex items-center gap-1 transition border border-slate-700 shadow-sm" title="Cambiar Contraseña">
+                    <i class="fa-solid fa-key text-sm text-amber-400"></i>
+                </button>
+
+                <!-- Opciones de Admin (Backup/Excel) -->
+                <div id="adminBackupBtns" class="flex gap-1.5">
+                    <button onclick="exportToExcel()" class="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs flex items-center gap-1 transition border border-emerald-400/30 shadow-sm" title="Exportar a Excel">
+                        <i class="fa-solid fa-file-excel text-sm"></i>
+                    </button>
+                    <button onclick="exportData()" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs flex items-center transition border border-slate-700 shadow-sm" title="Backup JSON">
+                        <i class="fa-solid fa-download text-sm text-sky-400"></i>
+                    </button>
+                    <label class="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs flex items-center cursor-pointer transition border border-slate-700 shadow-sm" title="Importar JSON">
+                        <i class="fa-solid fa-upload text-sm text-purple-400"></i>
+                        <input type="file" id="importFileInput" accept=".json" class="hidden" onchange="importData(event)">
+                    </label>
+                </div>
+
+                <!-- Botón Cerrar Sesión -->
+                <button onclick="logout()" class="p-2 bg-rose-600/80 hover:bg-rose-600 rounded-xl text-xs flex items-center gap-1 transition border border-rose-400/30 shadow-sm" title="Cerrar Sesión">
+                    <i class="fa-solid fa-right-from-bracket text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Modal de Inicio de Sesión -->
+    <div id="loginModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl text-center">
+            <div class="w-16 h-16 bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
+                <i class="fa-solid fa-user-lock"></i>
+            </div>
+            <h3 class="font-bold text-xl text-white mb-1">Iniciar Sesión</h3>
+            <p class="text-xs text-slate-400 mb-5">Ingresa tus credenciales para acceder al sistema</p>
+
+            <form id="loginForm" onsubmit="handleLoginSubmit(event)" class="space-y-4 text-left">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1.5">Usuario</label>
+                    <div class="relative">
+                        <select id="loginUserSelect" class="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:outline-none appearance-none">
+                            <!-- Generado dinámicamente -->
+                        </select>
+                        <i class="fa-solid fa-chevron-down absolute right-3.5 top-3.5 text-xs text-slate-400 pointer-events-none"></i>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1.5">Contraseña</label>
+                    <input type="password" id="loginPasswordInput" required placeholder="Ingresa tu contraseña" class="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent focus:outline-none">
+                </div>
+
+                <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm transition shadow-lg shadow-indigo-600/30 mt-2 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i> Ingresar al Sistema
+                </button>
+            </form>
+
+            <div class="mt-4 p-2.5 bg-slate-800/60 rounded-xl border border-slate-700/50 text-[11px] text-slate-400">
+                <p class="font-semibold text-indigo-300 mb-0.5">💡 Clave por defecto Admins:</p>
+                <code class="text-amber-400 font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-700">Admin123</code>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Container -->
+    <main class="max-w-md mx-auto px-4 pt-4">
+
+        <!-- Navegación Tabs -->
+        <div class="flex bg-slate-800/80 p-1.5 rounded-2xl mb-4 text-xs font-semibold border border-slate-700/60 shadow-inner">
+            <button onclick="switchTab('inventory')" id="tabBtnInventory" class="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white shadow-md text-center transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-boxes-stacked"></i> Inventario
+            </button>
+            <button onclick="switchTab('history')" id="tabBtnHistory" class="flex-1 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 text-center transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-clock-rotate-left"></i> Historial (<span id="historyCount">0</span>)
+            </button>
+        </div>
+
+        <!-- VISTA DE INVENTARIO -->
+        <div id="viewInventory">
+            <!-- Métricas Financieras (Solo para Administradores) -->
+            <section id="adminStatsSection" class="grid grid-cols-3 gap-2 mb-4">
+                <div class="bg-slate-800/90 p-2.5 rounded-2xl border border-slate-700/60 shadow-sm text-center">
+                    <span class="text-[10px] text-slate-400 font-medium block">Inversión Stock</span>
+                    <span id="statInvestment" class="text-xs font-black text-slate-100">$0.00</span>
+                </div>
+                <div class="bg-slate-800/90 p-2.5 rounded-2xl border border-slate-700/60 shadow-sm text-center">
+                    <span class="text-[10px] text-slate-400 font-medium block">Ganancia Proy.</span>
+                    <span id="statProfit" class="text-xs font-black text-emerald-400">$0.00</span>
+                </div>
+                <div class="bg-slate-800/90 p-2.5 rounded-2xl border border-slate-700/60 shadow-sm text-center">
+                    <span class="text-[10px] text-slate-400 font-medium block">Total Ventas</span>
+                    <span id="statSold" class="text-xs font-black text-indigo-400">$0.00</span>
+                </div>
+            </section>
+
+            <!-- Banner Modo Vendedor -->
+            <section id="userNoticeSection" class="mb-4 hidden">
+                <div class="bg-amber-500/10 border border-amber-500/30 p-3 rounded-2xl flex items-center gap-3 text-xs text-amber-200">
+                    <i class="fa-solid fa-shield-halved text-amber-400 text-lg"></i>
+                    <div>
+                        <p class="font-bold">Modo Vendedor Activo</p>
+                        <p class="text-[11px] text-amber-300/80">Consulta inventario, escanea códigos y registra ventas.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Búsqueda y Filtros de Productos -->
+            <section class="mb-4 space-y-2.5">
+                <div class="relative flex items-center">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400"></i>
+                    <input type="text" id="searchInput" placeholder="Buscar por nombre o escanear..." 
+                        oninput="renderProducts()"
+                        class="w-full pl-10 pr-12 py-2.5 bg-slate-800/90 border border-slate-700 rounded-2xl text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
+                    <button onclick="openScanner('search')" class="absolute right-2.5 p-1.5 text-indigo-400 hover:text-indigo-300 bg-indigo-600/20 rounded-xl border border-indigo-500/30">
+                        <i class="fa-solid fa-barcode text-base"></i>
+                    </button>
+                </div>
+
+                <div class="flex gap-2 overflow-x-auto no-scrollbar py-0.5">
+                    <button onclick="setFilter('all')" id="btnFilterAll" class="filter-btn bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap shadow-sm">
+                        Todos (<span id="countAll">0</span>)
+                    </button>
+                    <button onclick="setFilter('available')" id="btnFilterAvailable" class="filter-btn bg-slate-800 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap shadow-sm">
+                        En Stock (<span id="countAvailable">0</span>)
+                    </button>
+                    <button onclick="setFilter('low')" id="btnFilterLow" class="filter-btn bg-slate-800 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap shadow-sm">
+                        Bajo Stock (<span id="countLow">0</span>)
+                    </button>
+                    <button onclick="setFilter('out')" id="btnFilterOut" class="filter-btn bg-slate-800 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap shadow-sm">
+                        Agotados (<span id="countOut">0</span>)
+                    </button>
+                </div>
+            </section>
+
+            <!-- Lista de Productos -->
+            <section id="productList" class="space-y-3 mb-6">
+                <!-- Productos renderizados aquí -->
+            </section>
+        </div>
+
+        <!-- VISTA DE HISTORIAL -->
+        <div id="viewHistory" class="hidden space-y-3">
+            <div class="bg-slate-800/90 rounded-2xl border border-slate-700/60 p-4 shadow-sm">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-indigo-400"></i> Historial de Movimientos
+                    </h3>
+                    <button onclick="clearHistory()" id="btnClearHistory" class="text-xs text-rose-400 hover:underline hidden">
+                        Limpiar
+                    </button>
+                </div>
+
+                <!-- Buscador de Historial -->
+                <div class="relative mb-3">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+                    <input type="text" id="historySearchInput" placeholder="Buscar por usuario o acción..." oninput="renderHistory()" class="w-full pl-9 pr-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                </div>
+
+                <div id="historyList" class="space-y-2 text-xs">
+                    <!-- Registro cargado por JS -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Botón Flotante Agregar Producto (Solo Admins) -->
+    <button id="btnFloatingAdd" onclick="openProductModal()" class="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-2xl shadow-indigo-600/50 flex items-center justify-center text-2xl z-40 transition-transform active:scale-95 border border-indigo-400/40 hidden">
+        <i class="fa-solid fa-plus"></i>
+    </button>
+
+    <!-- Modal Acción Rápida por Código (Suma / Venta rápida) -->
+    <div id="quickScanModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-5 shadow-2xl">
+            <div class="flex justify-between items-center mb-3">
+                <span class="text-xs font-bold text-indigo-400 uppercase tracking-wider">Producto Encontrado</span>
+                <button onclick="closeQuickScanModal()" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <input type="hidden" id="quickProductId">
+            <div class="flex items-center gap-3 bg-slate-800/80 p-3 rounded-2xl border border-slate-700/60 mb-4">
+                <div id="quickProductMedia" class="w-14 h-14 bg-slate-900 rounded-xl flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-700"></div>
+                <div class="min-w-0 flex-1">
+                    <h4 id="quickProductTitle" class="font-bold text-sm text-slate-100 truncate"></h4>
+                    <p id="quickProductBarcode" class="text-[11px] text-slate-400"></p>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span id="quickProductStock" class="text-xs font-bold px-2 py-0.5 rounded-full"></span>
+                        <span id="quickProductPrice" class="text-xs font-bold text-slate-200"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Cantidad de Unidades</label>
+                    <input type="number" id="quickQuantityInput" min="1" value="1" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-center text-base font-bold text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                    <button onclick="processQuickAction('sell')" class="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30">
+                        <i class="fa-solid fa-cart-shopping"></i> Registrar Venta
+                    </button>
+                    <button id="btnQuickAddStock" onclick="processQuickAction('add')" class="py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/30">
+                        <i class="fa-solid fa-plus-circle"></i> Sumar Stock
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Formulario Producto -->
+    <div id="productModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="px-5 py-4 bg-slate-800/90 border-b border-slate-700/60 flex justify-between items-center">
+                <h3 id="modalTitle" class="font-bold text-base text-white">Nuevo Producto</h3>
+                <button onclick="closeProductModal()" class="text-slate-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="productForm" onsubmit="saveProduct(event)" class="p-5 overflow-y-auto space-y-4 text-xs">
+                <input type="hidden" id="productId">
+                <input type="hidden" id="mediaBase64">
+
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">Código de Barras</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="productBarcode" placeholder="Ej: 750123456789" class="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <button type="button" onclick="openScanner('form')" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold flex items-center gap-1.5">
+                            <i class="fa-solid fa-camera"></i> Escanear
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">Nombre / Descripción *</label>
+                    <input type="text" id="productTitle" required placeholder="Ej: Camiseta de Algodón Talla M" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Precio Compra ($) *</label>
+                        <input type="number" step="0.01" id="productCost" required placeholder="0.00" oninput="calculateProfit()" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Precio Venta ($) *</label>
+                        <input type="number" step="0.01" id="productPrice" required placeholder="0.00" oninput="calculateProfit()" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700/50 flex justify-between items-center">
+                    <span class="text-slate-400 font-medium">Ganancia Unitaria:</span>
+                    <span id="calculatedProfit" class="font-bold text-emerald-400">$0.00 (0%)</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Stock Disponible *</label>
+                        <input type="number" min="0" id="productStock" required placeholder="1" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Unidades Vendidas</label>
+                        <input type="number" min="0" id="productSoldCount" value="0" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">Foto o Video</label>
+                    <input type="file" id="mediaInput" accept="image/*,video/*" capture="environment" onchange="previewMedia(event)" class="w-full text-slate-400 text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:bg-slate-800 file:text-indigo-300 hover:file:bg-slate-700 border border-slate-700 rounded-xl">
+                    <div id="mediaPreviewContainer" class="mt-2 relative rounded-xl overflow-hidden border border-slate-700 hidden"></div>
+                </div>
+
+                <div class="pt-2 flex gap-3">
+                    <button type="button" onclick="closeProductModal()" class="w-1/2 py-2.5 border border-slate-700 text-slate-300 rounded-xl font-semibold hover:bg-slate-800">Cancelar</button>
+                    <button type="submit" class="w-1/2 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold shadow-lg shadow-indigo-600/30">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Gestión de Usuarios / Vendedores (Solo Admins) -->
+    <div id="userManagerModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="px-5 py-4 bg-slate-800/90 border-b border-slate-700/60 flex justify-between items-center">
+                <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                    <i class="fa-solid fa-users-gear text-indigo-400"></i> Gestión de Vendedores
+                </h3>
+                <button onclick="closeUserManagerModal()" class="text-slate-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <div class="p-4 overflow-y-auto space-y-4">
+                <!-- Formulario Agregar / Editar Vendedor -->
+                <form id="userForm" onsubmit="saveUser(event)" class="bg-slate-800/60 p-3.5 rounded-2xl border border-slate-700/60 space-y-3">
+                    <h4 id="userFormTitle" class="text-xs font-bold text-indigo-400 uppercase tracking-wider">Nuevo Vendedor</h4>
+                    <input type="hidden" id="editUserId">
+                    
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Nombre Completo</label>
+                        <input type="text" id="userFullNameInput" required placeholder="Ej. Carlos Mendoza" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Usuario</label>
+                            <input type="text" id="usernameInput" required placeholder="carlos1" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-300 mb-1">Contraseña</label>
+                            <input type="password" id="userPassInput" required placeholder="Clave" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 pt-1">
+                        <button type="button" onclick="resetUserForm()" class="w-1/2 py-1.5 border border-slate-700 text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-800">Cancelar</button>
+                        <button type="submit" class="w-1/2 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold">Guardar</button>
+                    </div>
+                </form>
+
+                <!-- Lista de Usuarios Existentes -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Lista de Vendedores</h4>
+                    </div>
+
+                    <div class="relative mb-2">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+                        <input type="text" id="userSearchInput" placeholder="Buscar por nombre o usuario..." oninput="renderUsersList()" class="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                    </div>
+
+                    <div id="usersListContainer" class="space-y-2">
+                        <!-- Renderizado dinámicamente -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cambiar Contraseña -->
+    <div id="changePasswordModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-xs rounded-3xl p-5 shadow-2xl">
+            <h3 class="font-bold text-white text-sm mb-1 flex items-center gap-2">
+                <i class="fa-solid fa-key text-indigo-400"></i> Cambiar Mi Contraseña
+            </h3>
+            <p class="text-xs text-slate-400 mb-4" id="changePasswordUserLabel">Usuario actual</p>
+
+            <form onsubmit="handleChangePasswordSubmit(event)" class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">Contraseña Actual</label>
+                    <input type="password" id="currentPassInput" required class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-300 mb-1">Nueva Contraseña</label>
+                    <input type="password" id="newPassInput" required class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="closeChangePasswordModal()" class="w-1/2 py-2 border border-slate-700 text-slate-300 rounded-xl font-semibold">Cancelar</button>
+                    <button type="submit" class="w-1/2 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold">Actualizar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Escáner de Cámara -->
+    <div id="scannerModal" class="fixed inset-0 bg-slate-950 z-50 hidden flex flex-col justify-between">
+        <div class="p-4 flex justify-between items-center text-white bg-slate-900/90 border-b border-slate-800">
+            <h3 class="font-bold text-sm">Escaneando Código de Barras</h3>
+            <button onclick="closeScanner()" class="p-2 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-2xl"></i>
+            </button>
+        </div>
+
+        <div class="flex-1 flex flex-col items-center justify-center p-4">
+            <div id="interactive" class="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl border-2 border-indigo-500 bg-black"></div>
+            <p class="text-xs text-slate-400 mt-4 text-center">Apunte con la cámara hacia el código de barras</p>
+        </div>
+
+        <div class="p-4 bg-slate-900/90 text-center border-t border-slate-800">
+            <button onclick="closeScanner()" class="px-6 py-2.5 bg-slate-800 text-white rounded-xl text-xs font-semibold border border-slate-700">
+                Cancelar Escaneo
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Notificaciones -->
+    <div id="toast" class="fixed bottom-20 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 hidden z-50 flex items-center space-x-2.5 transition-all duration-300">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toastMessage">Operación realizada con éxito</span>
+    </div>
+
+    <script>
+        const DEFAULT_USERS = [
+            { id: 'usr_admin1', name: 'Admin 1', username: 'admin1', role: 'admin', pass: 'Admin123' },
+            { id: 'usr_admin2', name: 'Admin 2', username: 'admin2', role: 'admin', pass: 'Admin123' },
+            { id: 'usr_admin3', name: 'Admin 3', username: 'admin3', role: 'admin', pass: 'Admin123' },
+            { id: 'usr_user1', name: 'Usuario 1', username: 'vendedor1', role: 'user', pass: '1234' },
+            { id: 'usr_user2', name: 'Usuario 2', username: 'vendedor2', role: 'user', pass: '1234' },
+            { id: 'usr_user3', name: 'Usuario 3', username: 'vendedor3', role: 'user', pass: '1234' },
+            { id: 'usr_user4', name: 'Usuario 4', username: 'vendedor4', role: 'user', pass: '1234' },
+            { id: 'usr_user5', name: 'Usuario 5', username: 'vendedor5', role: 'user', pass: '1234' },
+            { id: 'usr_user6', name: 'Usuario 6', username: 'vendedor6', role: 'user', pass: '1234' },
+            { id: 'usr_user7', name: 'Usuario 7', username: 'vendedor7', role: 'user', pass: '1234' },
+            { id: 'usr_user8', name: 'Usuario 8', username: 'vendedor8', role: 'user', pass: '1234' },
+            { id: 'usr_user9', name: 'Usuario 9', username: 'vendedor9', role: 'user', pass: '1234' },
+            { id: 'usr_user10', name: 'Usuario 10', username: 'vendedor10', role: 'user', pass: '1234' },
+            { id: 'usr_user11', name: 'Usuario 11', username: 'vendedor11', role: 'user', pass: '1234' },
+            { id: 'usr_user12', name: 'Usuario 12', username: 'vendedor12', role: 'user', pass: '1234' },
+            { id: 'usr_user13', name: 'Usuario 13', username: 'vendedor13', role: 'user', pass: '1234' }
+        ];
+
+        let systemUsers = [];
+        let products = [];
+        let historyLogs = [];
+        let currentUser = null;
+        let activeFilter = 'all';
+        let html5QrcodeScanner = null;
+        let scannerTargetMode = 'form';
+
+        window.onload = function() {
+            loadSystemUsers();
+            loadProducts();
+            loadHistory();
+            initLoginSelect();
+            checkSession();
+        };
+
+        function loadSystemUsers() {
+            try {
+                const saved = localStorage.getItem('inventory_users');
+                systemUsers = saved ? JSON.parse(saved) : DEFAULT_USERS;
+            } catch (e) {
+                systemUsers = DEFAULT_USERS;
+            }
+        }
+
+        function saveSystemUsers() {
+            try {
+                localStorage.setItem('inventory_users', JSON.stringify(systemUsers));
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function loadHistory() {
+            try {
+                const saved = localStorage.getItem('inventory_history');
+                historyLogs = saved ? JSON.parse(saved) : [];
+            } catch (e) {
+                historyLogs = [];
+            }
+            renderHistory();
+        }
+
+        function saveHistory() {
+            try {
+                localStorage.setItem('inventory_history', JSON.stringify(historyLogs));
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function addHistoryLog(action, details) {
+            const log = {
+                id: 'log_' + Date.now(),
+                timestamp: new Date().toLocaleString('es-ES'),
+                user: currentUser ? currentUser.name : 'Sistema',
+                action,
+                details
+            };
+            historyLogs.unshift(log);
+            saveHistory();
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('historyList');
+            const searchVal = (document.getElementById('historySearchInput')?.value || '').toLowerCase().trim();
+            document.getElementById('historyCount').innerText = historyLogs.length;
+
+            if (currentUser && currentUser.role === 'admin') {
+                document.getElementById('btnClearHistory').classList.remove('hidden');
+            } else {
+                document.getElementById('btnClearHistory').classList.add('hidden');
+            }
+
+            const filteredLogs = historyLogs.filter(log => 
+                log.action.toLowerCase().includes(searchVal) ||
+                log.user.toLowerCase().includes(searchVal) ||
+                log.details.toLowerCase().includes(searchVal)
+            );
+
+            if (filteredLogs.length === 0) {
+                container.innerHTML = `<p class="text-slate-500 text-center py-6 text-xs">No hay registros que coincidan.</p>`;
+                return;
+            }
+
+            container.innerHTML = filteredLogs.map(log => `
+                <div class="p-2.5 bg-slate-900/80 border border-slate-700/60 rounded-xl space-y-1">
+                    <div class="flex justify-between items-center text-[10px] text-slate-400">
+                        <span class="font-bold text-indigo-400 flex items-center gap-1"><i class="fa-solid fa-user text-[9px]"></i> ${escapeHtml(log.user)}</span>
+                        <span>${log.timestamp}</span>
+                    </div>
+                    <p class="font-bold text-slate-200 text-xs">${escapeHtml(log.action)}</p>
+                    <p class="text-[11px] text-slate-400">${escapeHtml(log.details)}</p>
+                </div>
+            `).join('');
+        }
+
+        function clearHistory() {
+            if (currentUser.role !== 'admin') return;
+            if (confirm('¿Seguro que deseas borrar el historial de movimientos?')) {
+                historyLogs = [];
+                saveHistory();
+                renderHistory();
+                showToast('Historial limpiado', 'success');
+            }
+        }
+
+        function switchTab(tab) {
+            if (tab === 'inventory') {
+                document.getElementById('viewInventory').classList.remove('hidden');
+                document.getElementById('viewHistory').classList.add('hidden');
+                document.getElementById('tabBtnInventory').className = "flex-1 py-2.5 rounded-xl bg-indigo-600 text-white shadow-md text-center transition flex items-center justify-center gap-1.5";
+                document.getElementById('tabBtnHistory').className = "flex-1 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 text-center transition flex items-center justify-center gap-1.5";
+            } else {
+                document.getElementById('viewInventory').classList.add('hidden');
+                document.getElementById('viewHistory').classList.remove('hidden');
+                document.getElementById('tabBtnHistory').className = "flex-1 py-2.5 rounded-xl bg-indigo-600 text-white shadow-md text-center transition flex items-center justify-center gap-1.5";
+                document.getElementById('tabBtnInventory').className = "flex-1 py-2.5 rounded-xl text-slate-400 hover:text-slate-200 text-center transition flex items-center justify-center gap-1.5";
+            }
+        }
+
+        function checkSession() {
+            const savedUserId = localStorage.getItem('inventory_active_user');
+            if (savedUserId) {
+                const found = systemUsers.find(u => u.id === savedUserId);
+                if (found) {
+                    currentUser = found;
+                    document.getElementById('loginModal').classList.add('hidden');
+                    updateUIPermissions();
+                    renderProducts();
+                    return;
+                }
+            }
+            openLoginModal();
+        }
+
+        function initLoginSelect() {
+            const select = document.getElementById('loginUserSelect');
+            select.innerHTML = systemUsers.map(u => `
+                <option value="${u.id}">${u.name} (${u.role === 'admin' ? 'Admin' : 'Vendedor'}) - [${u.username}]</option>
+            `).join('');
+        }
+
+        function openLoginModal() {
+            initLoginSelect();
+            document.getElementById('loginPasswordInput').value = '';
+            document.getElementById('loginModal').classList.remove('hidden');
+        }
+
+        function logout() {
+            localStorage.removeItem('inventory_active_user');
+            currentUser = null;
+            openLoginModal();
+            showToast('Sesión cerrada', 'success');
+        }
+
+        function handleLoginSubmit(e) {
+            e.preventDefault();
+            const selectedId = document.getElementById('loginUserSelect').value;
+            const enteredPass = document.getElementById('loginPasswordInput').value;
+
+            const user = systemUsers.find(u => u.id === selectedId);
+            if (!user) return;
+
+            if (user.pass === enteredPass) {
+                currentUser = user;
+                localStorage.setItem('inventory_active_user', user.id);
+                document.getElementById('loginModal').classList.add('hidden');
+                updateUIPermissions();
+                renderProducts();
+                addHistoryLog('Inicio de Sesión', `Usuario ${user.name} ingresó al sistema.`);
+                showToast(`Sesión iniciada como ${user.name}`, 'success');
+            } else {
+                showToast('Contraseña incorrecta', 'error');
+            }
+        }
+
+        function updateUIPermissions() {
+            if (!currentUser) return;
+            const badge = document.getElementById('currentUserBadge');
+            const adminStats = document.getElementById('adminStatsSection');
+            const userNotice = document.getElementById('userNoticeSection');
+            const adminBackupBtns = document.getElementById('adminBackupBtns');
+            const btnFloatingAdd = document.getElementById('btnFloatingAdd');
+            const btnManageUsers = document.getElementById('btnManageUsers');
+
+            if (currentUser.role === 'admin') {
+                badge.className = 'text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1 border border-emerald-500/30';
+                badge.innerHTML = `<i class="fa-solid fa-user-shield"></i> ${currentUser.name} (Admin)`;
+                
+                adminStats.classList.remove('hidden');
+                userNotice.classList.add('hidden');
+                adminBackupBtns.classList.remove('hidden');
+                btnFloatingAdd.classList.remove('hidden');
+                btnManageUsers.classList.remove('hidden');
+            } else {
+                badge.className = 'text-[10px] font-semibold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1 border border-amber-500/30';
+                badge.innerHTML = `<i class="fa-solid fa-user"></i> ${currentUser.name} (Vendedor)`;
+
+                adminStats.classList.add('hidden');
+                userNotice.classList.remove('hidden');
+                adminBackupBtns.classList.add('hidden');
+                btnFloatingAdd.classList.add('hidden');
+                btnManageUsers.classList.add('hidden');
+            }
+        }
+
+        function openChangePasswordModal() {
+            if (!currentUser) return;
+            document.getElementById('changePasswordUserLabel').innerText = `Usuario: ${currentUser.name} (${currentUser.username})`;
+            document.getElementById('currentPassInput').value = '';
+            document.getElementById('newPassInput').value = '';
+            document.getElementById('changePasswordModal').classList.remove('hidden');
+        }
+
+        function closeChangePasswordModal() {
+            document.getElementById('changePasswordModal').classList.add('hidden');
+        }
+
+        function handleChangePasswordSubmit(e) {
+            e.preventDefault();
+            const currentPass = document.getElementById('currentPassInput').value;
+            const newPass = document.getElementById('newPassInput').value;
+
+            if (currentPass !== currentUser.pass) {
+                showToast('La contraseña actual es incorrecta', 'error');
+                return;
+            }
+
+            currentUser.pass = newPass;
+            const idx = systemUsers.findIndex(u => u.id === currentUser.id);
+            if (idx >= 0) {
+                systemUsers[idx].pass = newPass;
+                saveSystemUsers();
+            }
+
+            closeChangePasswordModal();
+            addHistoryLog('Cambio de Contraseña', `El usuario ${currentUser.name} actualizó su clave.`);
+            showToast('Contraseña actualizada correctamente', 'success');
+        }
+
+        function openUserManagerModal() {
+            if (currentUser.role !== 'admin') return;
+            resetUserForm();
+            renderUsersList();
+            document.getElementById('userManagerModal').classList.remove('hidden');
+        }
+
+        function closeUserManagerModal() {
+            document.getElementById('userManagerModal').classList.add('hidden');
+        }
+
+        function resetUserForm() {
+            document.getElementById('userFormTitle').innerText = 'Nuevo Vendedor';
+            document.getElementById('editUserId').value = '';
+            document.getElementById('userFullNameInput').value = '';
+            document.getElementById('usernameInput').value = '';
+            document.getElementById('userPassInput').value = '';
+        }
+
+        function renderUsersList() {
+            const container = document.getElementById('usersListContainer');
+            const searchVal = (document.getElementById('userSearchInput')?.value || '').toLowerCase().trim();
+
+            const filteredUsers = systemUsers.filter(u => 
+                u.name.toLowerCase().includes(searchVal) || 
+                u.username.toLowerCase().includes(searchVal)
+            );
+
+            if (filteredUsers.length === 0) {
+                container.innerHTML = `<p class="text-slate-500 text-center py-4 text-xs">No se encontraron vendedores.</p>`;
+                return;
+            }
+
+            container.innerHTML = filteredUsers.map(u => `
+                <div class="p-3 bg-slate-900 border border-slate-700/60 rounded-xl flex justify-between items-center text-xs">
+                    <div>
+                        <p class="font-bold text-slate-100 flex items-center gap-1.5">
+                            ${escapeHtml(u.name)} 
+                            <span class="text-[10px] font-medium ${u.role === 'admin' ? 'text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20' : 'text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded'}">
+                                ${u.role === 'admin' ? 'Admin' : 'Vendedor'}
+                            </span>
+                        </p>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Usuario: <strong class="text-indigo-300">${escapeHtml(u.username)}</strong></p>
+                    </div>
+                    <div class="flex gap-1">
+                        <button onclick="editUser('${u.id}')" class="p-1.5 text-slate-400 hover:text-indigo-400 rounded-lg hover:bg-slate-800">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        ${u.id !== currentUser.id ? `
+                            <button onclick="deleteUser('${u.id}')" class="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-800">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function saveUser(e) {
+            e.preventDefault();
+            if (currentUser.role !== 'admin') return;
+
+            const editId = document.getElementById('editUserId').value;
+            const name = document.getElementById('userFullNameInput').value.trim();
+            const username = document.getElementById('usernameInput').value.trim().toLowerCase();
+            const pass = document.getElementById('userPassInput').value.trim();
+
+            if (editId) {
+                const u = systemUsers.find(user => user.id === editId);
+                if (u) {
+                    u.name = name;
+                    u.username = username;
+                    u.pass = pass;
+                    addHistoryLog('Usuario Modificado', `Vendedor ${name} (${username}) fue actualizado.`);
+                    showToast('Usuario actualizado', 'success');
+                }
+            } else {
+                const newUser = {
+                    id: 'usr_' + Date.now(),
+                    name,
+                    username,
+                    role: 'user',
+                    pass
+                };
+                systemUsers.push(newUser);
+                addHistoryLog('Nuevo Vendedor Creado', `Se registró al vendedor ${name} (${username}).`);
+                showToast('Nuevo vendedor agregado', 'success');
+            }
+
+            saveSystemUsers();
+            resetUserForm();
+            renderUsersList();
+            initLoginSelect();
+        }
+
+        function editUser(id) {
+            const u = systemUsers.find(user => user.id === id);
+            if (!u) return;
+            document.getElementById('userFormTitle').innerText = 'Editar Vendedor';
+            document.getElementById('editUserId').value = u.id;
+            document.getElementById('userFullNameInput').value = u.name;
+            document.getElementById('usernameInput').value = u.username;
+            document.getElementById('userPassInput').value = u.pass;
+        }
+
+        function deleteUser(id) {
+            if (currentUser.role !== 'admin') return;
+            const u = systemUsers.find(user => user.id === id);
+            if (!u) return;
+
+            if (confirm(`¿Eliminar al usuario ${u.name}?`)) {
+                systemUsers = systemUsers.filter(user => user.id !== id);
+                saveSystemUsers();
+                renderUsersList();
+                initLoginSelect();
+                addHistoryLog('Usuario Eliminado', `Se eliminó al vendedor ${u.name}.`);
+                showToast('Usuario eliminado', 'success');
+            }
+        }
+
+        function exportToExcel() {
+            if (currentUser.role !== 'admin') return;
+            if (products.length === 0) {
+                showToast('No hay productos para exportar', 'error');
+                return;
+            }
+
+            const dataToExport = products.map(p => {
+                const stock = parseInt(p.stock) || 0;
+                const sold = parseInt(p.soldCount) || 0;
+                const cost = parseFloat(p.cost) || 0;
+                const price = parseFloat(p.price) || 0;
+                return {
+                    "Código de Barras": p.barcode || 'N/A',
+                    "Nombre": p.title,
+                    "Stock Disponible": stock,
+                    "Unidades Vendidas": sold,
+                    "Precio Compra ($)": cost,
+                    "Precio Venta ($)": price,
+                    "Inversión Stock ($)": (cost * stock).toFixed(2),
+                    "Ganancia Proyectada ($)": ((price - cost) * stock).toFixed(2),
+                    "Ventas Totales ($)": (price * sold).toFixed(2),
+                    "Estado": stock === 0 ? 'Agotado' : (stock <= 3 ? 'Bajo Stock' : 'En Stock')
+                };
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario_Stock");
+
+            XLSX.writeFile(workbook, `Inventario_Stock_${new Date().toISOString().slice(0,10)}.xlsx`);
+            addHistoryLog('Reporte Exportado', 'Se descargó el reporte completo de stock en Excel.');
+            showToast('Reporte Excel generado', 'success');
+        }
+
+        function loadProducts() {
+            try {
+                const data = localStorage.getItem('inventory_products');
+                const rawList = data ? JSON.parse(data) : [];
+                // Adaptar campos antiguos si existen
+                products = rawList.map(p => ({
+                    ...p,
+                    stock: p.stock !== undefined ? parseInt(p.stock) : (p.status === 'available' ? 1 : 0),
+                    soldCount: p.soldCount !== undefined ? parseInt(p.soldCount) : (p.status === 'sold' ? 1 : 0)
+                }));
+            } catch (e) {
+                products = [];
+                showToast('Error al leer almacenamiento local', 'error');
+            }
+        }
+
+        function saveProductsToStorage() {
+            try {
+                localStorage.setItem('inventory_products', JSON.stringify(products));
+            } catch (e) {
+                showToast('Límite de memoria alcanzado', 'error');
+            }
+        }
+
+        function renderProducts() {
+            const listContainer = document.getElementById('productList');
+            const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
+            const isAdmin = currentUser.role === 'admin';
+
+            let countAll = products.length;
+            let countAvailable = 0;
+            let countLow = 0;
+            let countOut = 0;
+
+            products.forEach(p => {
+                const stock = parseInt(p.stock) || 0;
+                if (stock > 3) countAvailable++;
+                else if (stock > 0 && stock <= 3) countLow++;
+                else if (stock === 0) countOut++;
+            });
+
+            document.getElementById('countAll').innerText = countAll;
+            document.getElementById('countAvailable').innerText = countAvailable;
+            document.getElementById('countLow').innerText = countLow;
+            document.getElementById('countOut').innerText = countOut;
+
+            let filtered = products.filter(p => {
+                const stock = parseInt(p.stock) || 0;
+                let matchesFilter = true;
+                if (activeFilter === 'available') matchesFilter = stock > 3;
+                else if (activeFilter === 'low') matchesFilter = stock > 0 && stock <= 3;
+                else if (activeFilter === 'out') matchesFilter = stock === 0;
+
+                const matchesSearch = p.title.toLowerCase().includes(searchVal) || (p.barcode && p.barcode.toLowerCase().includes(searchVal));
+                return matchesFilter && matchesSearch;
+            });
+
+            if (isAdmin) {
+                let totalInvestment = 0;
+                let totalProfit = 0;
+                let totalSold = 0;
+
+                products.forEach(p => {
+                    const cost = parseFloat(p.cost) || 0;
+                    const price = parseFloat(p.price) || 0;
+                    const stock = parseInt(p.stock) || 0;
+                    const sold = parseInt(p.soldCount) || 0;
+
+                    totalInvestment += (cost * stock);
+                    totalProfit += ((price - cost) * stock);
+                    totalSold += (price * sold);
+                });
+
+                document.getElementById('statInvestment').innerText = `$${totalInvestment.toFixed(2)}`;
+                document.getElementById('statProfit').innerText = `$${totalProfit.toFixed(2)}`;
+                document.getElementById('statSold').innerText = `$${totalSold.toFixed(2)}`;
+            }
+
+            if (filtered.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="text-center py-12 bg-slate-800/60 rounded-2xl border border-slate-700/60 p-4">
+                        <i class="fa-solid fa-box-open text-4xl text-slate-600 mb-2"></i>
+                        <p class="text-slate-300 font-medium text-sm">No hay productos registrados</p>
+                        <p class="text-slate-500 text-xs mt-1">${isAdmin ? 'Toca el botón "+" abajo para agregar uno.' : 'Escanea o consulta un código de barras.'}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            listContainer.innerHTML = filtered.map(p => {
+                const cost = parseFloat(p.cost) || 0;
+                const price = parseFloat(p.price) || 0;
+                const stock = parseInt(p.stock) || 0;
+                const sold = parseInt(p.soldCount) || 0;
+                const profit = price - cost;
+
+                let stockBadgeClass = 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30';
+                let stockText = `${stock} disp.`;
+                if (stock === 0) {
+                    stockBadgeClass = 'bg-rose-500/10 text-rose-300 border-rose-500/30';
+                    stockText = 'Agotado';
+                } else if (stock <= 3) {
+                    stockBadgeClass = 'bg-amber-500/10 text-amber-300 border-amber-500/30';
+                    stockText = `Bajo: ${stock}`;
+                }
+
+                let mediaHtml = `<div class="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-700/60">
+                                    <i class="fa-solid fa-image text-xl"></i>
+                                 </div>`;
+                if (p.media) {
+                    if (p.media.startsWith('data:video')) {
+                        mediaHtml = `<video src="${p.media}" class="w-16 h-16 object-cover rounded-xl flex-shrink-0 border border-slate-700/60" autoplay loop muted></video>`;
+                    } else {
+                        mediaHtml = `<img src="${p.media}" class="w-16 h-16 object-cover rounded-xl flex-shrink-0 border border-slate-700/60" alt="Producto">`;
+                    }
+                }
+
+                return `
+                    <div class="bg-slate-800/90 p-3 rounded-2xl border border-slate-700/60 shadow-sm flex items-center gap-3 relative">
+                        ${mediaHtml}
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start mb-1">
+                                <h4 class="font-bold text-slate-100 text-sm truncate pr-2">${escapeHtml(p.title)}</h4>
+                                <span class="px-2 py-0.5 text-[10px] font-bold rounded-full border ${stockBadgeClass}">
+                                    ${stockText}
+                                </span>
+                            </div>
+                            
+                            ${p.barcode ? `<p class="text-[11px] text-slate-400 mb-1 flex items-center gap-1"><i class="fa-solid fa-barcode text-indigo-400"></i> ${escapeHtml(p.barcode)}</p>` : ''}
+                            
+                            <div class="flex items-center gap-2.5 text-xs flex-wrap">
+                                <div><span class="text-slate-400">Precio:</span> <strong class="text-slate-100">$${price.toFixed(2)}</strong></div>
+                                ${isAdmin ? `<div><span class="text-slate-400">Gan/u:</span> <strong class="text-emerald-400">+$${profit.toFixed(2)}</strong></div>` : ''}
+                                <div><span class="text-slate-400">Vendidos:</span> <strong class="text-indigo-300">${sold}</strong></div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col gap-1 border-l pl-2 border-slate-700/60">
+                            <button onclick="openQuickScanModal('${p.id}')" class="p-1.5 text-emerald-400 hover:text-emerald-300 rounded-lg hover:bg-slate-700/50" title="Vender / Sumar Stock">
+                                <i class="fa-solid fa-cart-plus text-sm"></i>
+                            </button>
+
+                            ${isAdmin ? `
+                                <button onclick="editProduct('${p.id}')" class="p-1.5 text-slate-400 hover:text-indigo-400 rounded-lg hover:bg-slate-700/50">
+                                    <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                </button>
+                                <button onclick="deleteProduct('${p.id}')" class="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-700/50">
+                                    <i class="fa-solid fa-trash text-xs"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function setFilter(filter) {
+            activeFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.className = 'filter-btn bg-slate-800 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap shadow-sm';
+            });
+            const filterMap = { 'all': 'btnFilterAll', 'available': 'btnFilterAvailable', 'low': 'btnFilterLow', 'out': 'btnFilterOut' };
+            document.getElementById(filterMap[filter]).className = 'filter-btn bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap shadow-sm';
+            renderProducts();
+        }
+
+        function calculateProfit() {
+            const cost = parseFloat(document.getElementById('productCost').value) || 0;
+            const price = parseFloat(document.getElementById('productPrice').value) || 0;
+            const profit = price - cost;
+            const margin = cost > 0 ? ((profit / cost) * 100).toFixed(1) : 0;
+
+            const profitElem = document.getElementById('calculatedProfit');
+            profitElem.innerText = `$${profit.toFixed(2)} (${margin}%)`;
+            profitElem.className = profit >= 0 ? "font-bold text-emerald-400 text-xs" : "font-bold text-rose-400 text-xs";
+        }
+
+        function previewMedia(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('Archivo demasiado grande (máx 5MB)', 'error');
+                event.target.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64Data = e.target.result;
+                document.getElementById('mediaBase64').value = base64Data;
+                showPreviewElement(base64Data);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function showPreviewElement(src) {
+            const container = document.getElementById('mediaPreviewContainer');
+            container.classList.remove('hidden');
+
+            if (src.startsWith('data:video')) {
+                container.innerHTML = `
+                    <video src="${src}" class="max-h-48 w-full object-contain bg-black" controls autoplay loop muted></video>
+                    <button type="button" onclick="removeMedia()" class="absolute top-2 right-2 bg-rose-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                `;
+            } else {
+                container.innerHTML = `
+                    <img src="${src}" class="max-h-48 w-full object-contain bg-black">
+                    <button type="button" onclick="removeMedia()" class="absolute top-2 right-2 bg-rose-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                `;
+            }
+        }
+
+        function removeMedia() {
+            document.getElementById('mediaInput').value = '';
+            document.getElementById('mediaBase64').value = '';
+            const container = document.getElementById('mediaPreviewContainer');
+            container.classList.add('hidden');
+            container.innerHTML = '';
+        }
+
+        function openProductModal(editId = null, prefilledBarcode = '') {
+            if (currentUser.role !== 'admin') {
+                showToast('Solo administradores pueden crear/editar productos', 'error');
+                return;
+            }
+
+            const modal = document.getElementById('productModal');
+            const form = document.getElementById('productForm');
+            form.reset();
+            removeMedia();
+
+            if (editId) {
+                const p = products.find(prod => prod.id === editId);
+                if (p) {
+                    document.getElementById('modalTitle').innerText = 'Editar Producto';
+                    document.getElementById('productId').value = p.id;
+                    document.getElementById('productBarcode').value = p.barcode || '';
+                    document.getElementById('productTitle').value = p.title;
+                    document.getElementById('productCost').value = p.cost;
+                    document.getElementById('productPrice').value = p.price;
+                    document.getElementById('productStock').value = p.stock;
+                    document.getElementById('productSoldCount').value = p.soldCount || 0;
+                    if (p.media) {
+                        document.getElementById('mediaBase64').value = p.media;
+                        showPreviewElement(p.media);
+                    }
+                    calculateProfit();
+                }
+            } else {
+                document.getElementById('modalTitle').innerText = 'Nuevo Producto';
+                document.getElementById('productId').value = '';
+                document.getElementById('productBarcode').value = prefilledBarcode;
+                document.getElementById('productStock').value = 1;
+                document.getElementById('productSoldCount').value = 0;
+                calculateProfit();
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeProductModal() {
+            document.getElementById('productModal').classList.add('hidden');
+        }
+
+        function saveProduct(e) {
+            e.preventDefault();
+            if (currentUser.role !== 'admin') return;
+
+            const id = document.getElementById('productId').value || 'prod_' + Date.now();
+            const barcode = document.getElementById('productBarcode').value.trim();
+            const title = document.getElementById('productTitle').value.trim();
+            const cost = parseFloat(document.getElementById('productCost').value) || 0;
+            const price = parseFloat(document.getElementById('productPrice').value) || 0;
+            const stock = parseInt(document.getElementById('productStock').value) || 0;
+            const soldCount = parseInt(document.getElementById('productSoldCount').value) || 0;
+            const media = document.getElementById('mediaBase64').value;
+
+            const existingIndex = products.findIndex(p => p.id === id);
+            const productData = { 
+                id, 
+                barcode, 
+                title, 
+                cost, 
+                price, 
+                stock, 
+                soldCount, 
+                media, 
+                updatedAt: Date.now() 
+            };
+
+            if (existingIndex >= 0) {
+                products[existingIndex] = productData;
+                addHistoryLog('Producto Editado', `Producto "${title}" actualizado por ${currentUser.name}. Stock: ${stock}.`);
+                showToast('Producto actualizado correctamente', 'success');
+            } else {
+                products.unshift(productData);
+                addHistoryLog('Nuevo Producto', `Producto "${title}" registrado por ${currentUser.name} con ${stock} unidades.`);
+                showToast('Producto registrado exitosamente', 'success');
+            }
+
+            saveProductsToStorage();
+            renderProducts();
+            closeProductModal();
+        }
+
+        function editProduct(id) {
+            openProductModal(id);
+        }
+
+        function deleteProduct(id) {
+            if (currentUser.role !== 'admin') return;
+            const p = products.find(prod => prod.id === id);
+            if (confirm(`¿Estás seguro de eliminar "${p ? p.title : 'este producto'}"?`)) {
+                products = products.filter(item => item.id !== id);
+                saveProductsToStorage();
+                renderProducts();
+                if (p) addHistoryLog('Producto Eliminado', `Producto "${p.title}" eliminado por ${currentUser.name}.`);
+                showToast('Producto eliminado', 'success');
+            }
+        }
+
+        // --- FUNCIONALIDAD DE VENTA / SUMA RÁPIDA POR SCANNER O BOTÓN ---
+        function openQuickScanModal(productId) {
+            const p = products.find(prod => prod.id === productId);
+            if (!p) return;
+
+            document.getElementById('quickProductId').value = p.id;
+            document.getElementById('quickProductTitle').innerText = p.title;
+            document.getElementById('quickProductBarcode').innerText = p.barcode ? `Código: ${p.barcode}` : 'Sin Código';
+            document.getElementById('quickProductPrice').innerText = `$${parseFloat(p.price).toFixed(2)}`;
+            document.getElementById('quickQuantityInput').value = 1;
+
+            const stockElem = document.getElementById('quickProductStock');
+            stockElem.innerText = `Stock: ${p.stock}`;
+            stockElem.className = p.stock === 0 ? 'text-xs font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300' : 'text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300';
+
+            const mediaContainer = document.getElementById('quickProductMedia');
+            if (p.media) {
+                if (p.media.startsWith('data:video')) {
+                    mediaContainer.innerHTML = `<video src="${p.media}" class="w-full h-full object-cover rounded-xl" autoplay loop muted></video>`;
+                } else {
+                    mediaContainer.innerHTML = `<img src="${p.media}" class="w-full h-full object-cover rounded-xl">`;
+                }
+            } else {
+                mediaContainer.innerHTML = `<i class="fa-solid fa-image text-xl"></i>`;
+            }
+
+            const btnAddStock = document.getElementById('btnQuickAddStock');
+            if (currentUser.role === 'admin') {
+                btnAddStock.classList.remove('hidden');
+            } else {
+                btnAddStock.classList.add('hidden');
+            }
+
+            document.getElementById('quickScanModal').classList.remove('hidden');
+        }
+
+        function closeQuickScanModal() {
+            document.getElementById('quickScanModal').classList.add('hidden');
+        }
+
+        function processQuickAction(type) {
+            const pId = document.getElementById('quickProductId').value;
+            const qty = parseInt(document.getElementById('quickQuantityInput').value) || 1;
+            const p = products.find(prod => prod.id === pId);
+
+            if (!p || qty <= 0) return;
+
+            if (type === 'sell') {
+                if (p.stock < qty) {
+                    showToast(`Stock insuficiente. Disponible: ${p.stock}`, 'error');
+                    return;
+                }
+                p.stock -= qty;
+                p.soldCount = (p.soldCount || 0) + qty;
+                addHistoryLog('Venta Registrada', `Venta de ${qty} unidad(es) de "${p.title}" realizada por ${currentUser.name}. Total: $${(qty * p.price).toFixed(2)}.`);
+                showToast(`Venta de ${qty} unidad(es) realizada`, 'success');
+            } else if (type === 'add') {
+                if (currentUser.role !== 'admin') {
+                    showToast('Solo admins pueden reabastecer stock', 'error');
+                    return;
+                }
+                p.stock += qty;
+                addHistoryLog('Stock Reabastecido', `Se agregaron ${qty} unidad(es) a "${p.title}" por ${currentUser.name}. Nuevo Stock: ${p.stock}.`);
+                showToast(`Se agregaron ${qty} unidades al stock`, 'success');
+            }
+
+            saveProductsToStorage();
+            renderProducts();
+            closeQuickScanModal();
+        }
+
+        function openScanner(targetMode = 'form') {
+            scannerTargetMode = targetMode;
+            document.getElementById('scannerModal').classList.remove('hidden');
+
+            if (!html5QrcodeScanner) {
+                html5QrcodeScanner = new Html5Qrcode("interactive");
+            }
+
+            const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+
+            html5QrcodeScanner.start(
+                { facingMode: "environment" }, 
+                config, 
+                onScanSuccess, 
+                onScanFailure
+            ).catch(err => {
+                showToast("No se pudo acceder a la cámara", "error");
+                closeScanner();
+            });
+        }
+
+        function onScanSuccess(decodedText) {
+            closeScanner();
+            const existingProduct = products.find(p => p.barcode === decodedText);
+
+            if (scannerTargetMode === 'form') {
+                if (currentUser.role === 'admin') {
+                    document.getElementById('productBarcode').value = decodedText;
+                }
+            } else if (scannerTargetMode === 'search') {
+                if (existingProduct) {
+                    openQuickScanModal(existingProduct.id);
+                } else {
+                    showToast("Código no registrado", "error");
+                    if (currentUser.role === 'admin') {
+                        if (confirm(`El código "${decodedText}" no existe. ¿Deseas darlo de alta?`)) {
+                            openProductModal(null, decodedText);
+                        }
+                    } else {
+                        document.getElementById('searchInput').value = decodedText;
+                        renderProducts();
+                    }
+                }
+            }
+        }
+
+        function onScanFailure(error) {}
+
+        function closeScanner() {
+            if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+                html5QrcodeScanner.stop().then(() => {
+                    document.getElementById('scannerModal').classList.add('hidden');
+                }).catch(() => {
+                    document.getElementById('scannerModal').classList.add('hidden');
+                });
+            } else {
+                document.getElementById('scannerModal').classList.add('hidden');
+            }
+        }
+
+        function exportData() {
+            if (currentUser.role !== 'admin') return;
+            if (products.length === 0) {
+                showToast('No hay datos para exportar', 'error');
+                return;
+            }
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(products, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `inventario_backup_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast('Backup JSON descargado', 'success');
+        }
+
+        function importData(event) {
+            if (currentUser.role !== 'admin') return;
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedProducts = JSON.parse(e.target.result);
+                    if (Array.isArray(importedProducts)) {
+                        products = importedProducts;
+                        saveProductsToStorage();
+                        renderProducts();
+                        showToast('Inventario importado correctamente', 'success');
+                    } else {
+                        showToast('Formato de archivo no válido', 'error');
+                    }
+                } catch (err) {
+                    showToast('Error al leer archivo JSON', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMessage.innerText = msg;
+            toastIcon.className = type === 'error' ? 'fa-solid fa-circle-exclamation text-rose-400 text-base' : 'fa-solid fa-circle-check text-emerald-400 text-base';
+
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        function escapeHtml(str) {
+            return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGradMask" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="50%" stop-color="#3730a3" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+    <linearGradient id="boxGrad1Mask" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8" />
+      <stop offset="100%" stop-color="#6366f1" />
+    </linearGradient>
+    <linearGradient id="boxGrad2Mask" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <linearGradient id="goldGradMask" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+  </defs>
+
+  <!-- Full-bleed background for maskable icon -->
+  <rect width="512" height="512" fill="url(#bgGradMask)" />
+
+  <!-- Centered safe area scale 0.72 -->
+  <g transform="translate(100, 95) scale(0.8)">
+    <path d="M60 210 L192 140 L324 210 L192 280 Z" fill="url(#boxGrad1Mask)" />
+    <path d="M60 210 L192 280 L192 370 L60 300 Z" fill="#4338ca" />
+    <path d="M192 280 L324 210 L324 300 L192 370 Z" fill="#312e81" />
+
+    <path d="M112 110 L192 68 L272 110 L192 152 Z" fill="url(#boxGrad2Mask)" />
+    <path d="M112 110 L192 152 L192 210 L112 168 Z" fill="#0284c7" />
+    <path d="M192 152 L272 110 L272 168 L192 210 Z" fill="#0369a1" />
+
+    <line x1="50" y1="210" x2="334" y2="210" stroke="#f43f5e" stroke-width="6" stroke-linecap="round" stroke-dasharray="16 8" />
+
+    <circle cx="290" cy="90" r="32" fill="url(#goldGradMask)" />
+    <path d="M276 90 L286 100 L304 82" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+</svg>

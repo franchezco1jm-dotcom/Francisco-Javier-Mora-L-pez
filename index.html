@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Blackberry Inventory - Compra • Vende • Encuentra</title>
+    <meta name="description" content="Blackberry Inventory - Sistema móvil de inventario con lector de códigos de barras, control de stock y acceso directo en pantalla de inicio." />
+    <meta property="og:title" content="Blackberry Inventory" />
+    <meta property="og:description" content="Blackberry Inventory - Compra • Vende • Encuentra. Control de stock y catálogo de productos." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#0d6efd">
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MiApp" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  </head>
+  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-purple-500 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js')
+            .then((reg) => console.log('Service Worker registrado con éxito:', reg.scope))
+            .catch((err) => console.error('Error al registrar Service Worker:', err));
+        });
+      }
+    </script>
+  </body>
+</html>
+

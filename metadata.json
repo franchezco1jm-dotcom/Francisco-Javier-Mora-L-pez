@@ -1,0 +1,6 @@
+{
+  "name": "MiInventario Pro",
+  "description": "Sistema de inventario móvil y catálogo con lector de códigos de barras, control de stock y acceso directo PWA instalable en pantalla de inicio.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
