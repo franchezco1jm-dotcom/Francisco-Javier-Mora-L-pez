@@ -44,6 +44,7 @@ import {
 import { User, Product, HistoryLog, FilterType, BatchCartItem, InvestmentRecord } from './types';
 import { ParsedImportItem } from './utils/importProducts';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
+import { PermissionsBanner } from './components/PermissionsBanner';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { QuickActionModal } from './components/QuickActionModal';
 import { ProductFormModal } from './components/ProductFormModal';
@@ -1328,6 +1329,9 @@ export default function App() {
         )}
         {/* PWA Home Screen Installation Guide Banner */}
         <PWAInstallBanner variant="banner" />
+
+        {/* One-Time Camera and Microphone Permission Primer */}
+        <PermissionsBanner onToast={showToast} />
 
         {/* View Tabs */}
         <div className="flex bg-slate-800/80 p-1.5 rounded-2xl mb-4 text-xs font-semibold border border-slate-700/60 shadow-inner">

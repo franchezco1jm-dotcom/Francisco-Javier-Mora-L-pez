@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Camera, X, RotateCcw, Check, RefreshCw, AlertTriangle } from 'lucide-react';
+import { getSavedCameraId } from '../utils/permissionManager';
 
 interface CameraCaptureModalProps {
   isOpen: boolean;
@@ -40,17 +41,36 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     stopCamera();
 
     try {
+      const savedCameraId = facingMode === 'environment' ? getSavedCameraId() : null;
       const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: { ideal: facingMode },
-          width: { ideal: 1280 },
-          height: { ideal: 960 },
-        },
+        video: savedCameraId
+          ? {
+              deviceId: { ideal: savedCameraId },
+              width: { ideal: 1280 },
+              height: { ideal: 960 },
+            }
+          : {
+              facingMode: { ideal: facingMode },
+              width: { ideal: 1280 },
+              height: { ideal: 960 },
+            },
         audio: false,
       };
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(mediaStream);
+
+      // Cache camera ID and permissions granted
+      try {
+        localStorage.setItem('inventory_permissions_granted_v2', 'true');
+        const track = mediaStream.getVideoTracks()[0];
+        const settings = track?.getSettings?.();
+        if (settings?.deviceId && facingMode === 'environment') {
+          localStorage.setItem('inventory_preferred_camera_id', settings.deviceId);
+        }
+      } catch {
+        // ignore
+      }
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;

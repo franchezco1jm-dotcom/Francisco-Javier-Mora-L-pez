@@ -97,6 +97,11 @@ export function useVoiceSearch(options: UseVoiceSearchOptions = {}) {
       recognition.onstart = () => {
         setIsListening(true);
         setError(null);
+        try {
+          localStorage.setItem('inventory_permissions_granted_v2', 'true');
+        } catch {
+          // ignore
+        }
       };
 
       recognition.onresult = (event: any) => {

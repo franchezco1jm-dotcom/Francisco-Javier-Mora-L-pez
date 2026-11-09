@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Product, BatchCartItem } from '../types';
 import { playScannerBeep } from '../utils/audio';
+import { getSavedCameraId } from '../utils/permissionManager';
 
 interface BarcodeScannerModalProps {
   isOpen: boolean;
@@ -118,17 +119,53 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           aspectRatio: 1.0,
         };
 
-        await qrCode.start(
-          { facingMode: 'environment' },
-          config,
-          (decodedText) => {
-            if (isCancelled) return;
-            handleDecodedBarcode(decodedText.trim());
-          },
-          () => {
-            // ignore scan frame errors
+        const savedCameraId = getSavedCameraId();
+        let started = false;
+
+        if (savedCameraId) {
+          try {
+            await qrCode.start(
+              { deviceId: { exact: savedCameraId } },
+              config,
+              (decodedText) => {
+                if (isCancelled) return;
+                handleDecodedBarcode(decodedText.trim());
+              },
+              () => {}
+            );
+            started = true;
+          } catch {
+            // fallback below
           }
-        );
+        }
+
+        if (!started) {
+          await qrCode.start(
+            { facingMode: 'environment' },
+            config,
+            (decodedText) => {
+              if (isCancelled) return;
+              handleDecodedBarcode(decodedText.trim());
+            },
+            () => {}
+          );
+        }
+
+        // Remember camera ID and permission approval to prevent re-prompts
+        try {
+          localStorage.setItem('inventory_permissions_granted_v2', 'true');
+          const cameras = await Html5Qrcode.getCameras();
+          if (cameras && cameras.length > 0) {
+            const backCam =
+              cameras.find((c) => /back|rear|environment|trasera/i.test(c.label)) ||
+              cameras[cameras.length - 1];
+            if (backCam?.id) {
+              localStorage.setItem('inventory_preferred_camera_id', backCam.id);
+            }
+          }
+        } catch {
+          // ignore
+        }
 
         if (!isCancelled) {
           setIsScanning(true);
@@ -141,7 +178,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           );
         }
       }
-    }, 200);
+    }, 150);
 
     return () => {
       isCancelled = true;
