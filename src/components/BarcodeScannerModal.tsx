@@ -162,6 +162,21 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       }
       html5QrCodeRef.current = null;
     }
+    // Explicitly release camera video tracks to avoid memory exhaustion and browser tab restarts
+    try {
+      const container = document.getElementById(scannerContainerId);
+      if (container) {
+        const videos = container.getElementsByTagName('video');
+        for (let i = 0; i < videos.length; i++) {
+          const videoStream = videos[i].srcObject as MediaStream;
+          if (videoStream && videoStream.getTracks) {
+            videoStream.getTracks().forEach((track) => track.stop());
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
     setIsScanning(false);
   };
 

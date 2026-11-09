@@ -1,13 +1,4 @@
-import * as XLSX from 'xlsx';
-import * as pdfjsLib from 'pdfjs-dist';
 import { Product } from '../types';
-
-// Use local worker bundled by Vite
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
-}
 
 
 export interface ParsedImportItem {
@@ -25,7 +16,8 @@ export interface ParsedImportItem {
 /**
  * Downloads a sample Excel template for inventory importing
  */
-export function downloadExcelTemplate() {
+export async function downloadExcelTemplate() {
+  const XLSX = await import('xlsx');
   const sampleData = [
     {
       'Producto': 'Funda Silicona iPhone 14',
@@ -71,6 +63,7 @@ export function downloadExcelTemplate() {
  * Parses an Excel or CSV file buffer
  */
 export async function parseExcelFile(file: File): Promise<ParsedImportItem[]> {
+  const XLSX = await import('xlsx');
   const arrayBuffer = await file.arrayBuffer();
   const workbook = XLSX.read(arrayBuffer, { type: 'array' });
   const firstSheetName = workbook.SheetNames[0];
@@ -181,6 +174,15 @@ export async function parseExcelFile(file: File): Promise<ParsedImportItem[]> {
  * Parses a PDF file using pdfjs-dist
  */
 export async function parsePdfFile(file: File): Promise<ParsedImportItem[]> {
+  const [pdfjsLib, { default: pdfWorker }] = await Promise.all([
+    import('pdfjs-dist'),
+    import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
+  ]);
+
+  if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+  }
+
   const arrayBuffer = await file.arrayBuffer();
   const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
   const pdfDoc = await loadingTask.promise;

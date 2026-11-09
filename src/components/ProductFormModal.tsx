@@ -13,6 +13,7 @@ import {
   Tag,
 } from 'lucide-react';
 import { CameraCaptureModal } from './CameraCaptureModal';
+import { compressImage } from '../utils/imageCompressor';
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -118,26 +119,30 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     new Set([...DEFAULT_CATEGORIES, ...existingCategories.filter(Boolean)])
   );
 
-  const handleGalleryFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGalleryFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 8 * 1024 * 1024) {
-      onToast('El archivo supera los 8MB permitidos', 'error');
-      e.target.value = '';
-      return;
+    try {
+      const compressed = await compressImage(file, 600, 600, 0.78);
+      setMedia(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        setMedia(result);
+      };
+      reader.readAsDataURL(file);
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      setMedia(result);
-    };
-    reader.readAsDataURL(file);
   };
 
-  const handleCameraCapture = (photoBase64: string) => {
-    setMedia(photoBase64);
+  const handleCameraCapture = async (photoBase64: string) => {
+    try {
+      const compressed = await compressImage(photoBase64, 600, 600, 0.78);
+      setMedia(compressed);
+    } catch {
+      setMedia(photoBase64);
+    }
     onToast('Foto capturada correctamente con la cámara');
   };
 

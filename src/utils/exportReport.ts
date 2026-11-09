@@ -1,6 +1,3 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
 import { Product } from '../types';
 
 interface ExportReportOptions {
@@ -13,15 +10,18 @@ interface ExportReportOptions {
   isAdmin: boolean;
 }
 
-export function exportInventoryToExcel({
+export async function exportInventoryToExcel({
   products,
   globalInvestment,
   totalRetailValue,
   projectedNetProfit,
   totalSold,
   isAdmin,
-}: ExportReportOptions) {
+}: ExportReportOptions): Promise<boolean> {
   if (products.length === 0) return false;
+
+  // Dynamically load XLSX on-demand to keep initial app bundle featherweight
+  const XLSX = await import('xlsx');
 
   const dataToExport = products.map((p, idx) => {
     const stock = Number(p.stock) || 0;
@@ -68,7 +68,7 @@ export function exportInventoryToExcel({
   return true;
 }
 
-export function exportInventoryToPDF({
+export async function exportInventoryToPDF({
   products,
   globalInvestment,
   totalRetailValue,
@@ -76,8 +76,14 @@ export function exportInventoryToPDF({
   totalSold,
   userName,
   isAdmin,
-}: ExportReportOptions) {
+}: ExportReportOptions): Promise<boolean> {
   if (products.length === 0) return false;
+
+  // Dynamically load jsPDF and autoTable only when the user requests a PDF
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
 
   const doc = new jsPDF({
     orientation: 'portrait',

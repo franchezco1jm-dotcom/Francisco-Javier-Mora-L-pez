@@ -30,39 +30,49 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const handleExportExcel = () => {
-    const success = exportInventoryToExcel({
-      products,
-      globalInvestment,
-      totalRetailValue,
-      projectedNetProfit,
-      totalSold,
-      userName,
-      isAdmin,
-    });
-    if (success) {
-      onToast('Reporte en Excel descargado correctamente');
-      onClose();
-    } else {
-      onToast('No hay productos para exportar', 'error');
+  const handleExportExcel = async () => {
+    try {
+      const success = await exportInventoryToExcel({
+        products,
+        globalInvestment,
+        totalRetailValue,
+        projectedNetProfit,
+        totalSold,
+        userName,
+        isAdmin,
+      });
+      if (success) {
+        onToast('Reporte en Excel descargado correctamente');
+        onClose();
+      } else {
+        onToast('No hay productos para exportar', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      onToast('Error al generar archivo Excel', 'error');
     }
   };
 
-  const handleExportPDF = () => {
-    const success = exportInventoryToPDF({
-      products,
-      globalInvestment,
-      totalRetailValue,
-      projectedNetProfit,
-      totalSold,
-      userName,
-      isAdmin,
-    });
-    if (success) {
-      onToast('Reporte en PDF generado y descargado');
-      onClose();
-    } else {
-      onToast('No hay productos para exportar', 'error');
+  const handleExportPDF = async () => {
+    try {
+      const success = await exportInventoryToPDF({
+        products,
+        globalInvestment,
+        totalRetailValue,
+        projectedNetProfit,
+        totalSold,
+        userName,
+        isAdmin,
+      });
+      if (success) {
+        onToast('Reporte en PDF generado y descargado');
+        onClose();
+      } else {
+        onToast('No hay productos para exportar', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      onToast('Error al generar archivo PDF', 'error');
     }
   };
 
